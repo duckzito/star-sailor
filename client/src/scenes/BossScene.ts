@@ -65,7 +65,11 @@ export class BossScene extends Phaser.Scene {
   }
 
   create(): void {
-    this.cameras.main.setBackgroundColor('#0a0010');
+    const bgColors: Record<string, string> = {
+      lunar: '#0a0a2e', asteroid: '#1a0a0a', nebula: '#0a1a0a', station: '#0a0a1a', darkstar: '#050008',
+    };
+    const levelConfig = LEVEL_CONFIGS[this.levelIndex];
+    this.cameras.main.setBackgroundColor(bgColors[levelConfig.theme] ?? '#0a0010');
     this.sfx = new SoundFX(this);
 
     // Boss arena — flat with walls
@@ -130,21 +134,138 @@ export class BossScene extends Phaser.Scene {
   }
 
   private createArena(): void {
+    const levelConfig = LEVEL_CONFIGS[this.levelIndex];
+    const theme = levelConfig.theme;
     const arenaWidth = GAME_WIDTH;
+    const T = TILE_SIZE;
+
+    const themeColors: Record<string, { floor: number; wall: number; plat: number }> = {
+      lunar: { floor: 0x555577, wall: 0x444466, plat: 0x6666aa },
+      asteroid: { floor: 0x664422, wall: 0x553311, plat: 0x886633 },
+      nebula: { floor: 0x226644, wall: 0x1a4433, plat: 0x338855 },
+      station: { floor: 0x444466, wall: 0x333355, plat: 0x5555aa },
+      darkstar: { floor: 0x332244, wall: 0x221133, plat: 0x443366 },
+    };
+    const c = themeColors[theme] ?? themeColors.darkstar;
+
     // Floor
-    for (let x = 0; x < arenaWidth; x += TILE_SIZE) {
-      const block = this.add.rectangle(x + TILE_SIZE / 2, GAME_HEIGHT - TILE_SIZE / 2, TILE_SIZE, TILE_SIZE, 0x332244);
-      this.platforms.add(block);
+    for (let x = 0; x < arenaWidth; x += T) {
+      this.platforms.add(this.add.rectangle(x + T / 2, GAME_HEIGHT - T / 2, T, T, c.floor));
     }
     // Walls
-    for (let y = 0; y < GAME_HEIGHT; y += TILE_SIZE) {
-      this.platforms.add(this.add.rectangle(TILE_SIZE / 2, y + TILE_SIZE / 2, TILE_SIZE, TILE_SIZE, 0x332244));
-      this.platforms.add(this.add.rectangle(arenaWidth - TILE_SIZE / 2, y + TILE_SIZE / 2, TILE_SIZE, TILE_SIZE, 0x332244));
+    for (let y = 0; y < GAME_HEIGHT; y += T) {
+      this.platforms.add(this.add.rectangle(T / 2, y + T / 2, T, T, c.wall));
+      this.platforms.add(this.add.rectangle(arenaWidth - T / 2, y + T / 2, T, T, c.wall));
     }
     // Mid platforms
     for (let i = 0; i < 3; i++) {
-      this.platforms.add(this.add.rectangle(300 + i * TILE_SIZE, GAME_HEIGHT - 150, TILE_SIZE, TILE_SIZE, 0x443366));
-      this.platforms.add(this.add.rectangle(GAME_WIDTH - 300 + i * TILE_SIZE, GAME_HEIGHT - 150, TILE_SIZE, TILE_SIZE, 0x443366));
+      this.platforms.add(this.add.rectangle(280 + i * T, GAME_HEIGHT - 160, T, T, c.plat));
+      this.platforms.add(this.add.rectangle(arenaWidth - 280 + i * T, GAME_HEIGHT - 160, T, T, c.plat));
+    }
+    // Higher platform in center
+    for (let i = 0; i < 4; i++) {
+      this.platforms.add(this.add.rectangle(arenaWidth / 2 - 64 + i * T, GAME_HEIGHT - 280, T, T, c.plat));
+    }
+
+    // Theme-specific arena decorations
+    this.decorateArena(theme, c);
+  }
+
+  private decorateArena(theme: string, c: { floor: number; wall: number; plat: number }): void {
+    const W = GAME_WIDTH;
+    const H = GAME_HEIGHT;
+
+    switch (theme) {
+      case 'lunar': {
+        // Craters on floor
+        for (const cx of [300, 640, 980]) {
+          this.add.ellipse(cx, H - 10, 60, 14, 0x3a3a5a, 0.5).setDepth(-1);
+        }
+        // Earth in sky
+        this.add.circle(W * 0.8, 80, 40, 0x4488cc, 0.4).setDepth(-2);
+        break;
+      }
+      case 'asteroid': {
+        // Lava cracks
+        for (const lx of [200, 500, 800, 1100]) {
+          const crack = this.add.rectangle(lx, H - 14, Phaser.Math.Between(30, 60), 3, 0xff4400, 0.7);
+          crack.setDepth(-1);
+          this.tweens.add({ targets: crack, alpha: { from: 0.3, to: 0.9 }, duration: 700, yoyo: true, repeat: -1 });
+        }
+        // Floating rocks
+        for (let i = 0; i < 8; i++) {
+          const r = Phaser.Math.Between(6, 15);
+          this.add.circle(Phaser.Math.Between(50, W - 50), Phaser.Math.Between(40, 300), r, 0x664433, 0.3).setDepth(-2);
+        }
+        break;
+      }
+      case 'nebula': {
+        // Bioluminescent mushrooms
+        for (let i = 0; i < 12; i++) {
+          const mx = Phaser.Math.Between(60, W - 60);
+          const shroom = this.add.circle(mx, H - 28, Phaser.Math.Between(3, 5), Phaser.Utils.Array.GetRandom([0x44ffaa, 0x88ff44]), 0.6);
+          shroom.setDepth(-1);
+          this.tweens.add({ targets: shroom, alpha: { from: 0.3, to: 0.8 }, duration: Phaser.Math.Between(1000, 2000), yoyo: true, repeat: -1 });
+        }
+        // Hanging vines from walls
+        for (let y = 100; y < H - 200; y += 80) {
+          for (const wx of [TILE_SIZE + 4, W - TILE_SIZE - 4]) {
+            const vine = this.add.rectangle(wx, y, 3, Phaser.Math.Between(25, 50), 0x44aa66, 0.4);
+            vine.setDepth(-1);
+            this.tweens.add({ targets: vine, angle: { from: -3, to: 3 }, duration: 1500, yoyo: true, repeat: -1 });
+          }
+        }
+        // Spore particles
+        for (let i = 0; i < 15; i++) {
+          const sx = Phaser.Math.Between(50, W - 50);
+          const sy = Phaser.Math.Between(100, H - 100);
+          const spore = this.add.circle(sx, sy, 2, 0x88ffaa, 0.3);
+          spore.setDepth(-1);
+          this.tweens.add({ targets: spore, y: sy - 60, alpha: 0, duration: Phaser.Math.Between(3000, 5000), repeat: -1 });
+        }
+        break;
+      }
+      case 'station': {
+        // Warning lights
+        for (const lx of [200, 450, 830, 1080]) {
+          const light = this.add.circle(lx, H - 50, 3, 0xff4444, 0.8);
+          light.setDepth(-1);
+          this.tweens.add({ targets: light, alpha: { from: 0.2, to: 1 }, duration: 500, yoyo: true, repeat: -1 });
+        }
+        // Grate lines
+        for (let x = TILE_SIZE; x < W - TILE_SIZE; x += 64) {
+          this.add.rectangle(x + 32, H - TILE_SIZE - 2, 56, 2, 0x555588, 0.3).setDepth(-1);
+        }
+        // Screens
+        for (const sx of [200, 640, 1080]) {
+          this.add.rectangle(sx, 100, 36, 26, 0x224488, 0.5).setDepth(-1);
+          const scr = this.add.rectangle(sx, 100, 32, 22, 0x44aaff, 0.2).setDepth(-1);
+          this.tweens.add({ targets: scr, alpha: { from: 0.15, to: 0.4 }, duration: 3000, yoyo: true, repeat: -1 });
+        }
+        break;
+      }
+      case 'darkstar': {
+        // Void cracks
+        for (const vx of [250, 640, 1030]) {
+          const crack = this.add.rectangle(vx, H - 14, 3, TILE_SIZE, 0xaa44ff, 0.5);
+          crack.setDepth(-1);
+          this.tweens.add({ targets: crack, alpha: { from: 0.2, to: 0.7 }, duration: 500, yoyo: true, repeat: -1 });
+          this.add.rectangle(vx, H - 14, 18, TILE_SIZE + 4, 0x6622aa, 0.1).setDepth(-2);
+        }
+        // Floating ruin fragments
+        for (let i = 0; i < 10; i++) {
+          const fx = Phaser.Math.Between(60, W - 60);
+          const fy = Phaser.Math.Between(80, 400);
+          const frag = this.add.rectangle(fx, fy, Phaser.Math.Between(4, 10), Phaser.Math.Between(4, 10), 0x443366, 0.3);
+          frag.setAngle(Phaser.Math.Between(0, 45)).setDepth(-1);
+          this.tweens.add({ targets: frag, y: fy + 8, angle: frag.angle + 15, duration: 3000, yoyo: true, repeat: -1 });
+        }
+        // Dark energy pillar glow at center
+        const pillar = this.add.rectangle(W / 2, H / 2, 8, H, 0x8844cc, 0.06);
+        pillar.setDepth(-3);
+        this.tweens.add({ targets: pillar, alpha: { from: 0.03, to: 0.08 }, duration: 2000, yoyo: true, repeat: -1 });
+        break;
+      }
     }
   }
 

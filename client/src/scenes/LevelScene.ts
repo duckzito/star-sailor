@@ -70,7 +70,8 @@ export class LevelScene extends Phaser.Scene {
 
   create(): void {
     this.cameras.main.setBackgroundColor(this.getThemeBgColor());
-    this.addStarfield();
+    const levelWidth = LevelLoader.getLevelWidth(this.levelConfig);
+    LevelLoader.addThemedBackground(this, this.levelConfig.theme, levelWidth);
 
     // Systems
     this.cameraSystem = new CameraSystem(this);
@@ -115,7 +116,6 @@ export class LevelScene extends Phaser.Scene {
     });
 
     // Boss gate
-    const levelWidth = LevelLoader.getLevelWidth(this.levelConfig);
     const bossGate = this.add.rectangle(levelWidth - 100, GAME_HEIGHT - 96, 32, 64, 0xff4444, 0.6);
     this.physics.add.existing(bossGate, true);
     this.physics.add.overlap(this.player, bossGate, () => {
@@ -293,21 +293,6 @@ export class LevelScene extends Phaser.Scene {
     }
   }
 
-  private addStarfield(): void {
-    const levelWidth = LevelLoader.getLevelWidth(this.levelConfig);
-    for (let i = 0; i < 100; i++) {
-      const x = Phaser.Math.Between(0, levelWidth);
-      const y = Phaser.Math.Between(0, GAME_HEIGHT);
-      const star = this.add.circle(x, y, Phaser.Math.Between(1, 2), 0xffffff, 0.5);
-      this.tweens.add({
-        targets: star,
-        alpha: { from: 0.2, to: 0.8 },
-        duration: Phaser.Math.Between(1000, 3000),
-        yoyo: true,
-        repeat: -1,
-      });
-    }
-  }
 
   update(time: number, delta: number): void {
     if (this.pauseMenu.isPaused()) return;
