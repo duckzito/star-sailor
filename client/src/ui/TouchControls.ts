@@ -3,19 +3,16 @@ import { GAME_WIDTH, GAME_HEIGHT } from '@shared/constants';
 
 /**
  * On-screen touch controls for mobile.
- * Left side: D-pad (left / right arrows)
- * Right side: action buttons (Jump, Dash, Melee, Ranged)
- * Top-right: Pause button
- *
- * All state is exposed as boolean flags read by InputManager.
- * Controls are created but only populated/visible on touch devices.
+ * Uses scene-level pointer tracking to correctly handle multi-touch.
+ * Each button tracks which pointer ID owns it, so releasing one finger
+ * never affects buttons held by another finger.
  */
 export class TouchControls {
   // Directional state
   left = false;
   right = false;
 
-  // Action state (momentary — true for one frame then cleared)
+  // Action state
   jumpPressed = false;
   dashPressed = false;
   meleePressed = false;
@@ -32,6 +29,11 @@ export class TouchControls {
   private _meleeConsumed = false;
   private _rangedConsumed = false;
 
+  // Map pointer ID → button key, so we know which button each finger owns
+  private pointerMap = new Map<number, string>();
+  // Map button key → { rect, setter }
+  private buttons = new Map<string, { rect: Phaser.GameObjects.Rectangle; down: () => void; up: () => void }>();
+
   constructor(scene: Phaser.Scene, onPause?: () => void) {
     this.scene = scene;
     this.onPause = onPause ?? null;
@@ -40,8 +42,8 @@ export class TouchControls {
     if (this.isTouchDevice()) {
       this.build();
       this.active = true;
+      this.setupScenePointerTracking();
 
-      // Reset all state on touchcancel (OS interrupts like incoming calls)
       document.addEventListener('touchcancel', () => this.resetAll());
       document.addEventListener('visibilitychange', () => {
         if (document.hidden) this.resetAll();
@@ -60,6 +62,66 @@ export class TouchControls {
     this.dashPressed = false;
     this.meleePressed = false;
     this.rangedPressed = false;
+    this.pointerMap.clear();
+  }
+
+  private setupScenePointerTracking(): void {
+    // On pointer down, find which button was hit and assign this pointer to it
+    this.scene.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+      const btn = this.hitTest(pointer);
+      if (!btn) return;
+
+      this.pointerMap.set(pointer.id, btn);
+      this.buttons.get(btn)!.down();
+    });
+
+    // On pointer up, release whichever button this pointer owned
+    this.scene.input.on('pointerup', (pointer: Phaser.Input.Pointer) => {
+      const btn = this.pointerMap.get(pointer.id);
+      if (btn) {
+        this.buttons.get(btn)?.up();
+        this.pointerMap.delete(pointer.id);
+      }
+    });
+
+    // On pointer move, check if finger slid off its button
+    this.scene.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
+      if (!pointer.isDown) return;
+      const ownedBtn = this.pointerMap.get(pointer.id);
+      if (!ownedBtn) return;
+
+      const currentBtn = this.hitTest(pointer);
+      if (currentBtn !== ownedBtn) {
+        // Finger left its button — release old
+        this.buttons.get(ownedBtn)?.up();
+        this.pointerMap.delete(pointer.id);
+
+        // If finger slid onto another button, press it
+        if (currentBtn) {
+          this.pointerMap.set(pointer.id, currentBtn);
+          this.buttons.get(currentBtn)!.down();
+        }
+      }
+    });
+  }
+
+  /** Hit-test a pointer against all registered button rects */
+  private hitTest(pointer: Phaser.Input.Pointer): string | null {
+    // Convert screen coordinates to game coordinates
+    const cam = this.scene.cameras.main;
+    const gx = (pointer.x - cam.x) / cam.zoom;
+    const gy = (pointer.y - cam.y) / cam.zoom;
+
+    for (const [key, { rect }] of this.buttons) {
+      const parent = rect.parentContainer;
+      const bx = parent ? parent.x : 0;
+      const by = parent ? parent.y : 0;
+      // rect origin is (0,0) so bounds are [bx, bx+w] x [by, by+h]
+      if (gx >= bx && gx <= bx + rect.width && gy >= by && gy <= by + rect.height) {
+        return key;
+      }
+    }
+    return null;
   }
 
   private build(): void {
@@ -70,48 +132,51 @@ export class TouchControls {
     // ===== LEFT SIDE: Direction buttons =====
     const dpadY = GAME_HEIGHT - pad - btnSize;
 
-    const leftBtn = this.makeButton(pad, dpadY, btnSize, btnSize, '\u25C0', 0x334466);
-    leftBtn.on('pointerdown', () => { this.left = true; });
-    leftBtn.on('pointerup', () => { this.left = false; });
+    this.registerButton('left', pad, dpadY, btnSize, btnSize, '\u25C0', 0x334466,
+      () => { this.left = true; },
+      () => { this.left = false; },
+    );
 
-    const rightBtn = this.makeButton(pad + btnSize + gap, dpadY, btnSize, btnSize, '\u25B6', 0x334466);
-    rightBtn.on('pointerdown', () => { this.right = true; });
-    rightBtn.on('pointerup', () => { this.right = false; });
+    this.registerButton('right', pad + btnSize + gap, dpadY, btnSize, btnSize, '\u25B6', 0x334466,
+      () => { this.right = true; },
+      () => { this.right = false; },
+    );
 
     // ===== RIGHT SIDE: Action buttons =====
-    // Layout:     [Dash]
-    //       [Melee][Jump][Ranged]
     const rightBase = GAME_WIDTH - pad - btnSize;
     const actionY = GAME_HEIGHT - pad - btnSize;
 
-    // Jump — big central button
-    const jumpBtn = this.makeButton(rightBase - btnSize - gap, actionY, btnSize, btnSize, 'JMP', 0x446644);
-    jumpBtn.on('pointerdown', () => { this.jumpPressed = true; this._jumpConsumed = false; });
-    jumpBtn.on('pointerup', () => { this.jumpPressed = false; });
+    this.registerButton('jump', rightBase - btnSize - gap, actionY, btnSize, btnSize, 'JMP', 0x446644,
+      () => { this.jumpPressed = true; this._jumpConsumed = false; },
+      () => { this.jumpPressed = false; },
+    );
 
-    // Melee — left of jump
-    const meleeBtn = this.makeButton(rightBase - (btnSize + gap) * 2, actionY, btnSize, btnSize, 'ATK', 0x664433);
-    meleeBtn.on('pointerdown', () => { this.meleePressed = true; this._meleeConsumed = false; });
-    meleeBtn.on('pointerup', () => { this.meleePressed = false; });
+    this.registerButton('melee', rightBase - (btnSize + gap) * 2, actionY, btnSize, btnSize, 'ATK', 0x664433,
+      () => { this.meleePressed = true; this._meleeConsumed = false; },
+      () => { this.meleePressed = false; },
+    );
 
-    // Ranged — right of jump
-    const rangedBtn = this.makeButton(rightBase, actionY, btnSize, btnSize, 'SHT', 0x443366);
-    rangedBtn.on('pointerdown', () => { this.rangedPressed = true; this._rangedConsumed = false; });
-    rangedBtn.on('pointerup', () => { this.rangedPressed = false; });
+    this.registerButton('ranged', rightBase, actionY, btnSize, btnSize, 'SHT', 0x443366,
+      () => { this.rangedPressed = true; this._rangedConsumed = false; },
+      () => { this.rangedPressed = false; },
+    );
 
-    // Dash — above jump
-    const dashBtn = this.makeButton(rightBase - btnSize - gap, actionY - btnSize - gap, btnSize, btnSize, 'DSH', 0x336666);
-    dashBtn.on('pointerdown', () => { this.dashPressed = true; this._dashConsumed = false; });
-    dashBtn.on('pointerup', () => { this.dashPressed = false; });
+    this.registerButton('dash', rightBase - btnSize - gap, actionY - btnSize - gap, btnSize, btnSize, 'DSH', 0x336666,
+      () => { this.dashPressed = true; this._dashConsumed = false; },
+      () => { this.dashPressed = false; },
+    );
 
     // ===== TOP-RIGHT: Pause =====
-    const pauseBtn = this.makeButton(GAME_WIDTH - pad - 48, pad, 48, 48, '| |', 0x444444);
-    pauseBtn.on('pointerdown', () => {
-      if (this.onPause) this.onPause();
-    });
+    this.registerButton('pause', GAME_WIDTH - pad - 48, pad, 48, 48, '| |', 0x444444,
+      () => { if (this.onPause) this.onPause(); },
+      () => {},
+    );
   }
 
-  private makeButton(x: number, y: number, w: number, h: number, label: string, color: number): Phaser.GameObjects.Rectangle {
+  private registerButton(
+    key: string, x: number, y: number, w: number, h: number,
+    label: string, color: number, down: () => void, up: () => void,
+  ): void {
     const bg = this.scene.add.rectangle(0, 0, w, h, color, 0.7).setStrokeStyle(2, 0xffffff, 0.4);
     bg.setOrigin(0, 0);
 
@@ -122,13 +187,11 @@ export class TouchControls {
     }).setOrigin(0.5);
 
     const btn = this.scene.add.container(x, y, [bg, txt]).setScrollFactor(0);
-    bg.setInteractive();
     this.container.add(btn);
 
-    return bg;
+    this.buttons.set(key, { rect: bg, down, up });
   }
 
-  /** Called by InputManager — returns true once per press */
   consumeJump(): boolean {
     if (this.jumpPressed && !this._jumpConsumed) {
       this._jumpConsumed = true;
@@ -166,6 +229,11 @@ export class TouchControls {
   }
 
   destroy(): void {
+    this.scene.input.off('pointerdown');
+    this.scene.input.off('pointerup');
+    this.scene.input.off('pointermove');
+    this.pointerMap.clear();
+    this.buttons.clear();
     this.container.destroy(true);
   }
 }
