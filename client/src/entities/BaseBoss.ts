@@ -12,6 +12,7 @@ export abstract class BaseBoss extends Phaser.Physics.Arcade.Sprite {
   private attackTimer = 0;
   private lastAttack: string | null = null;
   private target: Phaser.Physics.Arcade.Sprite | null = null;
+  private defeated = false;
 
   constructor(
     scene: Phaser.Scene,
@@ -51,7 +52,7 @@ export abstract class BaseBoss extends Phaser.Physics.Arcade.Sprite {
   }
 
   update(_time: number, delta: number): void {
-    if (!this.active || !this.target) return;
+    if (!this.active || this.defeated || !this.target) return;
 
     const phase = this.getCurrentPhase();
 
@@ -79,18 +80,27 @@ export abstract class BaseBoss extends Phaser.Physics.Arcade.Sprite {
   private telegraphAttack(attackName: string): void {
     this.setTint(0xff6600);
     this.scene.time.delayedCall(500, () => {
-      if (!this.active || !this.target) return;
+      if (!this.active || this.defeated || !this.target) return;
       this.clearTint();
       this.performAttack(attackName, this.target);
     });
   }
 
   takeDamage(amount: number): void {
-    if (this.invulnerable) return;
+    if (this.invulnerable || this.defeated) return;
 
     this.hp = Math.max(0, this.hp - amount);
     this.setTint(0xffffff);
-    this.scene.time.delayedCall(100, () => this.clearTint());
+    this.scene.time.delayedCall(100, () => {
+      if (!this.active || this.defeated) return;
+      this.clearTint();
+    });
+
+    // Death takes priority over phase transition
+    if (this.hp <= 0) {
+      this.onDefeated();
+      return;
+    }
 
     // Check phase transition
     const hpRatio = this.getHpRatio();
@@ -106,10 +116,6 @@ export abstract class BaseBoss extends Phaser.Physics.Arcade.Sprite {
     if (newPhase > this.currentPhase) {
       this.transitionPhase(newPhase);
     }
-
-    if (this.hp <= 0) {
-      this.onDefeated();
-    }
   }
 
   private transitionPhase(newPhase: number): void {
@@ -122,6 +128,7 @@ export abstract class BaseBoss extends Phaser.Physics.Arcade.Sprite {
     this.onPhaseTransition(newPhase);
 
     this.scene.time.delayedCall(1000, () => {
+      if (this.defeated) return;
       this.invulnerable = false;
       this.clearTint();
       // Attack quickly after phase transition
@@ -134,7 +141,11 @@ export abstract class BaseBoss extends Phaser.Physics.Arcade.Sprite {
   }
 
   private onDefeated(): void {
+    this.defeated = true;
+    this.invulnerable = true;
+
     const body = this.body as Phaser.Physics.Arcade.Body;
+    body.setVelocity(0, 0);
     body.setEnable(false);
 
     // Clean up all active projectiles immediately
