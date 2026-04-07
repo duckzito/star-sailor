@@ -51,11 +51,11 @@ export abstract class BaseBoss extends Phaser.Physics.Arcade.Sprite {
   }
 
   update(_time: number, delta: number): void {
-    if (!this.active || this.invulnerable || !this.target) return;
+    if (!this.active || !this.target) return;
 
     const phase = this.getCurrentPhase();
 
-    // Move toward target
+    // Move toward target (even during invulnerability)
     const dx = this.target.x - this.x;
     if (Math.abs(dx) > 60 && phase.speed > 0) {
       (this.body as Phaser.Physics.Arcade.Body).setVelocityX(Math.sign(dx) * phase.speed);
@@ -64,9 +64,9 @@ export abstract class BaseBoss extends Phaser.Physics.Arcade.Sprite {
       (this.body as Phaser.Physics.Arcade.Body).setVelocityX(0);
     }
 
-    // Attack timer — avoid repeating the same attack consecutively
+    // Attack timer keeps ticking, but don't attack while invulnerable
     this.attackTimer -= delta;
-    if (this.attackTimer <= 0) {
+    if (this.attackTimer <= 0 && !this.invulnerable) {
       this.attackTimer = phase.attackCooldown;
       let candidates = phase.attacks.filter((a) => a !== this.lastAttack);
       if (candidates.length === 0) candidates = phase.attacks;
@@ -124,6 +124,8 @@ export abstract class BaseBoss extends Phaser.Physics.Arcade.Sprite {
     this.scene.time.delayedCall(1000, () => {
       this.invulnerable = false;
       this.clearTint();
+      // Attack quickly after phase transition
+      this.attackTimer = Math.min(this.attackTimer, 300);
     });
   }
 
