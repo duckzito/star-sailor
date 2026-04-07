@@ -73,7 +73,7 @@ export class BossScene extends Phaser.Scene {
     this.createArena();
 
     // Player
-    this.inputManager = new InputManager(this);
+    this.inputManager = new InputManager(this, () => this.pauseMenu?.toggle());
     this.player = new StarSailor(this, 200, GAME_HEIGHT - 100, this.inputManager);
     this.physics.add.collider(this.player, this.platforms);
 
@@ -110,6 +110,7 @@ export class BossScene extends Phaser.Scene {
     this.events.on('shutdown', () => {
       this.bossHealthBar.destroy();
       this.pauseMenu.destroy();
+      this.inputManager.destroy();
       this.events.off('player-death');
       this.events.off('boss-defeated');
     });

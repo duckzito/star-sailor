@@ -90,7 +90,7 @@ export class LevelScene extends Phaser.Scene {
     this.lastCheckpoint = { ...this.levelConfig.checkpoints[0] };
 
     // Input & Player
-    this.inputManager = new InputManager(this);
+    this.inputManager = new InputManager(this, () => this.pauseMenu?.toggle());
     this.player = new StarSailor(this, this.lastCheckpoint.x, this.lastCheckpoint.y, this.inputManager);
     const stats = EquipmentSystem.applyLoadout(EquipmentSystem.getBaseStats(), this.loadout);
     this.player.stats = stats;
@@ -140,6 +140,7 @@ export class LevelScene extends Phaser.Scene {
     this.events.on('shutdown', () => {
       this.hud.destroy();
       this.pauseMenu.destroy();
+      this.inputManager.destroy();
       this.events.off('player-death');
       this.events.off('enemy-defeated');
     });

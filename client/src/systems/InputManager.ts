@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { TouchControls } from '../ui/TouchControls';
 
 export class InputManager {
   private cursors: Phaser.Types.Input.Keyboard.CursorKeys;
@@ -8,7 +9,9 @@ export class InputManager {
   private meleeKey: Phaser.Input.Keyboard.Key;
   private rangedKey: Phaser.Input.Keyboard.Key;
 
-  constructor(scene: Phaser.Scene) {
+  touch: TouchControls | null = null;
+
+  constructor(scene: Phaser.Scene, onPause?: () => void) {
     const keyboard = scene.input.keyboard!;
     this.cursors = keyboard.createCursorKeys();
     this.wasd = {
@@ -21,14 +24,17 @@ export class InputManager {
     this.dashKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SHIFT);
     this.meleeKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.Z);
     this.rangedKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.X);
+
+    // Touch controls — only created on touch-capable devices
+    this.touch = new TouchControls(scene, onPause);
   }
 
   isLeft(): boolean {
-    return this.cursors.left.isDown || this.wasd.A.isDown;
+    return this.cursors.left.isDown || this.wasd.A.isDown || (this.touch?.left ?? false);
   }
 
   isRight(): boolean {
-    return this.cursors.right.isDown || this.wasd.D.isDown;
+    return this.cursors.right.isDown || this.wasd.D.isDown || (this.touch?.right ?? false);
   }
 
   isUp(): boolean {
@@ -40,18 +46,27 @@ export class InputManager {
   }
 
   isJumpJustPressed(): boolean {
-    return Phaser.Input.Keyboard.JustDown(this.jumpKey) || Phaser.Input.Keyboard.JustDown(this.cursors.up);
+    return Phaser.Input.Keyboard.JustDown(this.jumpKey)
+      || Phaser.Input.Keyboard.JustDown(this.cursors.up)
+      || (this.touch?.consumeJump() ?? false);
   }
 
   isDashPressed(): boolean {
-    return Phaser.Input.Keyboard.JustDown(this.dashKey);
+    return Phaser.Input.Keyboard.JustDown(this.dashKey)
+      || (this.touch?.consumeDash() ?? false);
   }
 
   isMeleePressed(): boolean {
-    return Phaser.Input.Keyboard.JustDown(this.meleeKey);
+    return Phaser.Input.Keyboard.JustDown(this.meleeKey)
+      || (this.touch?.consumeMelee() ?? false);
   }
 
   isRangedPressed(): boolean {
-    return Phaser.Input.Keyboard.JustDown(this.rangedKey);
+    return Phaser.Input.Keyboard.JustDown(this.rangedKey)
+      || (this.touch?.consumeRanged() ?? false);
+  }
+
+  destroy(): void {
+    this.touch?.destroy();
   }
 }

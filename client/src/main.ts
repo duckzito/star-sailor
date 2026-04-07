@@ -27,6 +27,9 @@ const config: Phaser.Types.Core.GameConfig = {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
   },
+  input: {
+    activePointers: 4, // Support multi-touch (move + action simultaneously)
+  },
   backgroundColor: '#0a0a1a',
 };
 
