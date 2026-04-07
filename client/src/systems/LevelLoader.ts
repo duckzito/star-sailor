@@ -159,21 +159,27 @@ export class LevelLoader {
   }
 
   private static bgLunar(scene: Phaser.Scene, levelWidth: number): void {
-    // Earth in the sky
-    const earth = scene.add.circle(levelWidth * 0.7, 100, 60, 0x4488cc, 0.6);
-    scene.add.circle(levelWidth * 0.7 - 15, 85, 55, 0x55aadd, 0.3); // atmosphere
-    earth.setScrollFactor(0.1);
+    // Earth in the sky (large and prominent)
+    const earthX = levelWidth * 0.7;
+    scene.add.circle(earthX, 90, 70, 0x4488cc, 0.7).setScrollFactor(0.08).setDepth(-8);
+    scene.add.circle(earthX - 10, 80, 65, 0x55aadd, 0.3).setScrollFactor(0.08).setDepth(-8); // atmosphere
+    scene.add.circle(earthX + 15, 95, 30, 0x33aa55, 0.2).setScrollFactor(0.08).setDepth(-7); // continent
 
-    // Distant mountains (parallax)
-    const g = scene.add.graphics().setScrollFactor(0.3).setDepth(-5);
-    g.fillStyle(0x222244, 0.6);
-    for (let x = 0; x < levelWidth * 1.5; x += 200) {
-      const h = Phaser.Math.Between(80, 180);
-      g.fillTriangle(x, GAME_HEIGHT, x + 100, GAME_HEIGHT - h, x + 200, GAME_HEIGHT);
+    // Distant mountains (parallax) — two layers for depth
+    const far = scene.add.graphics().setScrollFactor(0.15).setDepth(-6);
+    far.fillStyle(0x1a1a3a, 0.7);
+    for (let x = 0; x < levelWidth * 1.5; x += 250) {
+      const h = Phaser.Math.Between(100, 220);
+      far.fillTriangle(x - 50, GAME_HEIGHT, x + 125, GAME_HEIGHT - h, x + 300, GAME_HEIGHT);
+    }
+    const near = scene.add.graphics().setScrollFactor(0.3).setDepth(-5);
+    near.fillStyle(0x2a2a4a, 0.6);
+    for (let x = 0; x < levelWidth * 1.5; x += 180) {
+      const h = Phaser.Math.Between(60, 140);
+      near.fillTriangle(x, GAME_HEIGHT, x + 90, GAME_HEIGHT - h, x + 180, GAME_HEIGHT);
     }
 
-    // Stars
-    LevelLoader.scatterStars(scene, levelWidth, 120, [0xffffff, 0xccccff, 0xaaaaee]);
+    LevelLoader.scatterStars(scene, levelWidth, 150, [0xffffff, 0xccccff, 0xaaaaee]);
   }
 
   // ==========================================
@@ -216,31 +222,49 @@ export class LevelLoader {
     this.addWall(scene, platforms, 1450, 400, 7, c3);
     this.addWall(scene, platforms, 2300, 420, 6, c3);
 
-    // Lava cracks (decorative glow)
-    for (const lx of [500, 1100, 1700, 2200, 2800]) {
-      const w = Phaser.Math.Between(40, 80);
-      const crack = scene.add.rectangle(lx, GY + T / 2, w, 4, 0xff4400, 0.8);
-      crack.setDepth(-1);
-      scene.tweens.add({ targets: crack, alpha: { from: 0.4, to: 0.9 }, duration: 800, yoyo: true, repeat: -1 });
-      // Glow
-      scene.add.rectangle(lx, GY + T / 2, w + 10, 12, 0xff2200, 0.15).setDepth(-2);
+    // Lava cracks (decorative — bright and prominent)
+    for (const lx of [350, 700, 1100, 1500, 1900, 2300, 2700, 3000]) {
+      const w = Phaser.Math.Between(50, 100);
+      // Wide glow underneath
+      scene.add.rectangle(lx, GY - 2, w + 30, 18, 0xff2200, 0.2).setDepth(2);
+      // Bright crack line
+      const crack = scene.add.rectangle(lx, GY - 2, w, 5, 0xff5500, 0.9);
+      crack.setDepth(2);
+      // Hot center
+      scene.add.rectangle(lx, GY - 2, w * 0.6, 2, 0xffaa44, 0.7).setDepth(2);
+      scene.tweens.add({ targets: crack, alpha: { from: 0.5, to: 1 }, duration: 600 + Phaser.Math.Between(0, 400), yoyo: true, repeat: -1 });
     }
   }
 
   private static bgAsteroid(scene: Phaser.Scene, levelWidth: number): void {
-    // Floating asteroid debris (parallax)
-    for (let i = 0; i < 25; i++) {
-      const x = Phaser.Math.Between(0, levelWidth);
-      const y = Phaser.Math.Between(30, 400);
-      const r = Phaser.Math.Between(8, 30);
-      const rock = scene.add.circle(x, y, r, Phaser.Utils.Array.GetRandom([0x553322, 0x664433, 0x775544]), 0.4);
-      rock.setScrollFactor(Phaser.Math.FloatBetween(0.15, 0.4)).setDepth(-4);
-    }
-    // Distant lava planet
-    scene.add.circle(200, 120, 80, 0xcc4400, 0.3).setScrollFactor(0.05).setDepth(-6);
-    scene.add.circle(200, 120, 75, 0xff6600, 0.15).setScrollFactor(0.05).setDepth(-6);
+    // Distant lava planet (large, prominent)
+    const planetX = levelWidth * 0.25;
+    scene.add.circle(planetX, 110, 90, 0xcc4400, 0.5).setScrollFactor(0.05).setDepth(-8);
+    scene.add.circle(planetX, 110, 85, 0xff6600, 0.25).setScrollFactor(0.05).setDepth(-8);
+    scene.add.circle(planetX - 20, 95, 80, 0xdd5500, 0.15).setScrollFactor(0.05).setDepth(-8); // atmosphere
 
-    LevelLoader.scatterStars(scene, levelWidth, 80, [0xffffff, 0xffccaa, 0xff8866]);
+    // Floating asteroid debris (parallax) — larger, more visible
+    for (let i = 0; i < 35; i++) {
+      const x = Phaser.Math.Between(-200, levelWidth + 200);
+      const y = Phaser.Math.Between(20, 500);
+      const r = Phaser.Math.Between(10, 40);
+      const color = Phaser.Utils.Array.GetRandom([0x553322, 0x664433, 0x775544, 0x886655]);
+      const rock = scene.add.circle(x, y, r, color, 0.5);
+      rock.setScrollFactor(Phaser.Math.FloatBetween(0.1, 0.35)).setDepth(-5);
+      // Highlight on rock
+      scene.add.circle(x - r * 0.3, y - r * 0.3, r * 0.4, this.lighten(color, 0.15), 0.3)
+        .setScrollFactor(rock.scrollFactorX).setDepth(-5);
+    }
+
+    // Distant mountain/ridge silhouette
+    const ridge = scene.add.graphics().setScrollFactor(0.2).setDepth(-6);
+    ridge.fillStyle(0x331a0a, 0.6);
+    for (let x = 0; x < levelWidth * 1.5; x += 150) {
+      const h = Phaser.Math.Between(60, 160);
+      ridge.fillTriangle(x - 30, GAME_HEIGHT, x + 75, GAME_HEIGHT - h, x + 180, GAME_HEIGHT);
+    }
+
+    LevelLoader.scatterStars(scene, levelWidth, 120, [0xffffff, 0xffccaa, 0xff8866]);
   }
 
   // ==========================================
@@ -316,26 +340,33 @@ export class LevelLoader {
   }
 
   private static bgNebula(scene: Phaser.Scene, levelWidth: number): void {
-    // Nebula gas clouds (large, colorful, parallax)
-    const colors = [0x225544, 0x336655, 0x224466, 0x334455];
-    for (let i = 0; i < 12; i++) {
-      const x = Phaser.Math.Between(-200, levelWidth + 200);
-      const y = Phaser.Math.Between(20, 350);
-      const r = Phaser.Math.Between(60, 150);
-      const cloud = scene.add.ellipse(x, y, r * 2, r, Phaser.Utils.Array.GetRandom(colors), 0.2);
-      cloud.setScrollFactor(Phaser.Math.FloatBetween(0.1, 0.3)).setDepth(-6);
+    // Nebula gas clouds — layered, colorful, much more visible
+    const cloudColors = [0x225544, 0x336655, 0x224466, 0x2a5540, 0x1a4435];
+    for (let i = 0; i < 20; i++) {
+      const x = Phaser.Math.Between(-300, levelWidth + 300);
+      const y = Phaser.Math.Between(-50, 400);
+      const r = Phaser.Math.Between(80, 200);
+      const cloud = scene.add.ellipse(x, y, r * 2.5, r * 1.2, Phaser.Utils.Array.GetRandom(cloudColors), 0.25);
+      cloud.setScrollFactor(Phaser.Math.FloatBetween(0.08, 0.25)).setDepth(-7);
     }
 
-    // Distant glowing spores floating up
-    for (let i = 0; i < 30; i++) {
+    // Bright nebula core streaks
+    const streaks = scene.add.graphics().setScrollFactor(0.12).setDepth(-6);
+    streaks.fillStyle(0x44aa66, 0.1);
+    for (let x = 0; x < levelWidth; x += 400) {
+      streaks.fillEllipse(x + 200, 200, 500, 100);
+    }
+
+    // Floating spores (more, larger, brighter)
+    for (let i = 0; i < 50; i++) {
       const x = Phaser.Math.Between(0, levelWidth);
       const y = Phaser.Math.Between(100, GAME_HEIGHT);
-      const spore = scene.add.circle(x, y, Phaser.Math.Between(1, 3), 0x88ffaa, 0.4);
-      spore.setScrollFactor(0.2).setDepth(-5);
-      scene.tweens.add({ targets: spore, y: y - Phaser.Math.Between(50, 200), alpha: 0, duration: Phaser.Math.Between(3000, 6000), repeat: -1 });
+      const spore = scene.add.circle(x, y, Phaser.Math.Between(2, 5), Phaser.Utils.Array.GetRandom([0x88ffaa, 0x66ff88, 0xaaff66]), 0.5);
+      spore.setScrollFactor(Phaser.Math.FloatBetween(0.15, 0.4)).setDepth(-5);
+      scene.tweens.add({ targets: spore, y: y - Phaser.Math.Between(80, 250), alpha: 0, duration: Phaser.Math.Between(3000, 7000), repeat: -1 });
     }
 
-    LevelLoader.scatterStars(scene, levelWidth, 60, [0xaaffcc, 0x88ffaa, 0x66ff88]);
+    LevelLoader.scatterStars(scene, levelWidth, 80, [0xaaffcc, 0x88ffaa, 0x66ff88]);
   }
 
   // ==========================================
@@ -540,6 +571,22 @@ export class LevelLoader {
 
   // ========== SHARED HELPERS ==========
 
+  /** Lighten a hex color by a factor (0-1) */
+  private static lighten(color: number, amount: number): number {
+    const r = Math.min(255, ((color >> 16) & 0xff) + Math.round(255 * amount));
+    const g = Math.min(255, ((color >> 8) & 0xff) + Math.round(255 * amount));
+    const b = Math.min(255, (color & 0xff) + Math.round(255 * amount));
+    return (r << 16) | (g << 8) | b;
+  }
+
+  /** Darken a hex color by a factor (0-1) */
+  private static darken(color: number, amount: number): number {
+    const r = Math.max(0, Math.round(((color >> 16) & 0xff) * (1 - amount)));
+    const g = Math.max(0, Math.round(((color >> 8) & 0xff) * (1 - amount)));
+    const b = Math.max(0, Math.round((color & 0xff) * (1 - amount)));
+    return (r << 16) | (g << 8) | b;
+  }
+
   private static buildGround(
     scene: Phaser.Scene,
     platforms: Phaser.Physics.Arcade.StaticGroup,
@@ -548,19 +595,41 @@ export class LevelLoader {
     fillColor: number,
   ): void {
     const levelWidth = 3200;
+    const highlight = this.lighten(topColor, 0.12);
+    const shadow = this.darken(fillColor, 0.2);
+
     for (let i = 0; i < Math.ceil(levelWidth / T); i++) {
       const heightMod = profile[i % profile.length] ?? 0;
       if (heightMod === 99) continue; // gap in terrain
       const tileY = GY + T / 2 - heightMod * (T / 2);
+      const cx = i * T + T / 2;
+
       // Top surface tile
-      const block = scene.add.rectangle(i * T + T / 2, tileY, T, T, topColor);
+      const block = scene.add.rectangle(cx, tileY, T, T, topColor);
       platforms.add(block);
+
+      // Surface highlight (top edge)
+      scene.add.rectangle(cx, tileY - T / 2 + 2, T, 3, highlight, 0.5).setDepth(1);
+
+      // Surface texture — random dots for grit
+      if (Math.random() > 0.5) {
+        const dotX = cx + Phaser.Math.Between(-10, 10);
+        const dotY = tileY + Phaser.Math.Between(-6, 6);
+        scene.add.circle(dotX, dotY, Phaser.Math.Between(1, 3), this.darken(topColor, 0.15), 0.4).setDepth(1);
+      }
+
       // Fill below to screen bottom
-      const fillHeight = GAME_HEIGHT - tileY + T;
-      if (fillHeight > T) {
-        const fill = scene.add.rectangle(i * T + T / 2, tileY + T / 2 + fillHeight / 2, T, fillHeight, fillColor);
+      const fillTop = tileY + T / 2;
+      const fillHeight = GAME_HEIGHT - fillTop + T;
+      if (fillHeight > 0) {
+        // Gradient-like fill: darker as it goes down
+        const fill = scene.add.rectangle(cx, fillTop + fillHeight / 2, T, fillHeight, fillColor);
         fill.setDepth(-1);
         platforms.add(fill);
+        // Deepest shadow strip
+        if (fillHeight > T * 2) {
+          scene.add.rectangle(cx, GAME_HEIGHT, T, T, shadow, 0.4).setDepth(-1);
+        }
       }
     }
   }
@@ -570,9 +639,31 @@ export class LevelLoader {
     platforms: Phaser.Physics.Arcade.StaticGroup,
     x: number, y: number, width: number, color: number,
   ): void {
+    const highlight = this.lighten(color, 0.15);
+    const shadow = this.darken(color, 0.25);
+    const totalW = width * T;
+
     for (let i = 0; i < width; i++) {
-      const block = scene.add.rectangle(x + i * T + T / 2, y + T / 2, T, T, color);
+      const cx = x + i * T + T / 2;
+      const block = scene.add.rectangle(cx, y + T / 2, T, T, color);
       platforms.add(block);
+    }
+
+    // Top edge highlight
+    scene.add.rectangle(x + totalW / 2, y + 2, totalW, 3, highlight, 0.6).setDepth(1);
+    // Bottom shadow
+    scene.add.rectangle(x + totalW / 2, y + T - 1, totalW, 2, shadow, 0.5).setDepth(1);
+    // Left edge
+    scene.add.rectangle(x + 1, y + T / 2, 2, T, highlight, 0.3).setDepth(1);
+    // Right edge
+    scene.add.rectangle(x + totalW - 1, y + T / 2, 2, T, shadow, 0.3).setDepth(1);
+
+    // Surface cracks/texture
+    for (let i = 0; i < width; i++) {
+      if (Math.random() > 0.6) {
+        const cx = x + i * T + Phaser.Math.Between(4, T - 4);
+        scene.add.rectangle(cx, y + Phaser.Math.Between(6, T - 4), Phaser.Math.Between(4, 12), 1, shadow, 0.4).setDepth(1);
+      }
     }
   }
 
@@ -581,9 +672,24 @@ export class LevelLoader {
     platforms: Phaser.Physics.Arcade.StaticGroup,
     x: number, y: number, height: number, color: number,
   ): void {
+    const highlight = this.lighten(color, 0.12);
+    const shadow = this.darken(color, 0.2);
+
     for (let i = 0; i < height; i++) {
-      const block = scene.add.rectangle(x + T / 2, y + i * T + T / 2, T, T, color);
+      const cy = y + i * T + T / 2;
+      const block = scene.add.rectangle(x + T / 2, cy, T, T, color);
       platforms.add(block);
+    }
+
+    const totalH = height * T;
+    // Left highlight
+    scene.add.rectangle(x + 2, y + totalH / 2, 3, totalH, highlight, 0.4).setDepth(1);
+    // Right shadow
+    scene.add.rectangle(x + T - 1, y + totalH / 2, 2, totalH, shadow, 0.4).setDepth(1);
+
+    // Brick/segment lines
+    for (let i = 1; i < height; i++) {
+      scene.add.rectangle(x + T / 2, y + i * T, T - 4, 1, shadow, 0.3).setDepth(1);
     }
   }
 
@@ -591,12 +697,13 @@ export class LevelLoader {
     for (let i = 0; i < count; i++) {
       const x = Phaser.Math.Between(0, levelWidth);
       const y = Phaser.Math.Between(0, GAME_HEIGHT - 100);
-      const star = scene.add.circle(x, y, Phaser.Math.Between(1, 2), Phaser.Utils.Array.GetRandom(colors), 0.5);
+      const size = Phaser.Math.Between(1, 3);
+      const star = scene.add.circle(x, y, size, Phaser.Utils.Array.GetRandom(colors), 0.6);
       star.setScrollFactor(Phaser.Math.FloatBetween(0.05, 0.2)).setDepth(-10);
       scene.tweens.add({
         targets: star,
-        alpha: { from: 0.2, to: 0.8 },
-        duration: Phaser.Math.Between(1000, 3000),
+        alpha: { from: 0.15, to: 0.9 },
+        duration: Phaser.Math.Between(800, 2500),
         yoyo: true,
         repeat: -1,
       });
