@@ -20,7 +20,7 @@ gameServer.define('coop', GameRoom);
 
 // Health check
 app.get('/health', (_req, res) => {
-  res.json({ status: 'ok', uptime: process.uptime() });
+  res.json({ status: 'ok' });
 });
 
 // In production, serve the built client as static files
@@ -28,9 +28,16 @@ if (isProduction) {
   // In Docker: /app/client (set via CLIENT_DIR)
   // Locally:   <project>/client/dist
   const clientDist = process.env.CLIENT_DIR || path.resolve(__dirname, '../../client/dist');
-  app.use(express.static(clientDist, { maxAge: '1d', etag: true }));
-  // SPA fallback
-  app.get('*', (_req, res) => {
+
+  // Hashed assets get long cache; index.html must not be cached
+  app.use(express.static(clientDist, { maxAge: '1d', etag: true, index: false }));
+
+  // SPA fallback — skip Colyseus and API paths
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/matchmake') || req.path.startsWith('/api') || req.path === '/health') {
+      return next();
+    }
+    res.setHeader('Cache-Control', 'no-cache');
     res.sendFile(path.join(clientDist, 'index.html'));
   });
 }

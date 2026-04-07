@@ -8,6 +8,7 @@ import { GAME_WIDTH, GAME_HEIGHT } from '@shared/constants';
  * Top-right: Pause button
  *
  * All state is exposed as boolean flags read by InputManager.
+ * Controls are created but only populated/visible on touch devices.
  */
 export class TouchControls {
   // Directional state
@@ -22,7 +23,7 @@ export class TouchControls {
 
   private scene: Phaser.Scene;
   private container: Phaser.GameObjects.Container;
-  private visible = false;
+  private active = false;
   private onPause: (() => void) | null = null;
 
   // Track consumed presses so InputManager can read-and-clear
@@ -38,7 +39,13 @@ export class TouchControls {
 
     if (this.isTouchDevice()) {
       this.build();
-      this.visible = true;
+      this.active = true;
+
+      // Reset all state on touchcancel (OS interrupts like incoming calls)
+      document.addEventListener('touchcancel', () => this.resetAll());
+      document.addEventListener('visibilitychange', () => {
+        if (document.hidden) this.resetAll();
+      });
     }
   }
 
@@ -46,10 +53,19 @@ export class TouchControls {
     return 'ontouchstart' in window || navigator.maxTouchPoints > 0;
   }
 
+  private resetAll(): void {
+    this.left = false;
+    this.right = false;
+    this.jumpPressed = false;
+    this.dashPressed = false;
+    this.meleePressed = false;
+    this.rangedPressed = false;
+  }
+
   private build(): void {
-    const pad = 20;
-    const btnSize = 56;
-    const gap = 8;
+    const pad = 16;
+    const btnSize = 68;
+    const gap = 10;
 
     // ===== LEFT SIDE: Direction buttons =====
     const dpadY = GAME_HEIGHT - pad - btnSize;
@@ -57,12 +73,10 @@ export class TouchControls {
     const leftBtn = this.makeButton(pad, dpadY, btnSize, btnSize, '\u25C0', 0x334466);
     leftBtn.on('pointerdown', () => { this.left = true; });
     leftBtn.on('pointerup', () => { this.left = false; });
-    leftBtn.on('pointerout', () => { this.left = false; });
 
     const rightBtn = this.makeButton(pad + btnSize + gap, dpadY, btnSize, btnSize, '\u25B6', 0x334466);
     rightBtn.on('pointerdown', () => { this.right = true; });
     rightBtn.on('pointerup', () => { this.right = false; });
-    rightBtn.on('pointerout', () => { this.right = false; });
 
     // ===== RIGHT SIDE: Action buttons =====
     // Layout:     [Dash]
@@ -74,39 +88,35 @@ export class TouchControls {
     const jumpBtn = this.makeButton(rightBase - btnSize - gap, actionY, btnSize, btnSize, 'JMP', 0x446644);
     jumpBtn.on('pointerdown', () => { this.jumpPressed = true; this._jumpConsumed = false; });
     jumpBtn.on('pointerup', () => { this.jumpPressed = false; });
-    jumpBtn.on('pointerout', () => { this.jumpPressed = false; });
 
     // Melee — left of jump
     const meleeBtn = this.makeButton(rightBase - (btnSize + gap) * 2, actionY, btnSize, btnSize, 'ATK', 0x664433);
     meleeBtn.on('pointerdown', () => { this.meleePressed = true; this._meleeConsumed = false; });
     meleeBtn.on('pointerup', () => { this.meleePressed = false; });
-    meleeBtn.on('pointerout', () => { this.meleePressed = false; });
 
     // Ranged — right of jump
     const rangedBtn = this.makeButton(rightBase, actionY, btnSize, btnSize, 'SHT', 0x443366);
     rangedBtn.on('pointerdown', () => { this.rangedPressed = true; this._rangedConsumed = false; });
     rangedBtn.on('pointerup', () => { this.rangedPressed = false; });
-    rangedBtn.on('pointerout', () => { this.rangedPressed = false; });
 
     // Dash — above jump
     const dashBtn = this.makeButton(rightBase - btnSize - gap, actionY - btnSize - gap, btnSize, btnSize, 'DSH', 0x336666);
     dashBtn.on('pointerdown', () => { this.dashPressed = true; this._dashConsumed = false; });
     dashBtn.on('pointerup', () => { this.dashPressed = false; });
-    dashBtn.on('pointerout', () => { this.dashPressed = false; });
 
     // ===== TOP-RIGHT: Pause =====
-    const pauseBtn = this.makeButton(GAME_WIDTH - pad - 44, pad, 44, 44, '| |', 0x444444);
+    const pauseBtn = this.makeButton(GAME_WIDTH - pad - 48, pad, 48, 48, '| |', 0x444444);
     pauseBtn.on('pointerdown', () => {
       if (this.onPause) this.onPause();
     });
   }
 
-  private makeButton(x: number, y: number, w: number, h: number, label: string, color: number): Phaser.GameObjects.Container {
+  private makeButton(x: number, y: number, w: number, h: number, label: string, color: number): Phaser.GameObjects.Rectangle {
     const bg = this.scene.add.rectangle(0, 0, w, h, color, 0.7).setStrokeStyle(2, 0xffffff, 0.4);
     bg.setOrigin(0, 0);
 
     const txt = this.scene.add.text(w / 2, h / 2, label, {
-      fontSize: '16px',
+      fontSize: '18px',
       color: '#ffffff',
       fontStyle: 'bold',
     }).setOrigin(0.5);
@@ -115,7 +125,6 @@ export class TouchControls {
     bg.setInteractive();
     this.container.add(btn);
 
-    // Return the bg (the interactive element)
     return bg;
   }
 
@@ -153,7 +162,7 @@ export class TouchControls {
   }
 
   isActive(): boolean {
-    return this.visible;
+    return this.active;
   }
 
   destroy(): void {
